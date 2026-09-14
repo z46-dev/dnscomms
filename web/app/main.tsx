@@ -1,35 +1,40 @@
-import { useEffect, useState } from "react";
+import { type SubmitEvent, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { loadSimulator } from "./wasm.js";
+import { loadSimulator, type SimulationResult, type Simulator } from "./wasm";
 import "./style.css";
 
 function App() {
-    const [simulate, setSimulate] = useState(null);
+    const [simulate, setSimulate] = useState<Simulator | null>(null);
     const [error, setError] = useState("");
-    const [result, setResult] = useState(null);
+    const [result, setResult] = useState<SimulationResult | null>(null);
 
     useEffect(() => {
-        loadSimulator()
+        void loadSimulator()
             .then((simulateMessage) => setSimulate(() => simulateMessage))
-            .catch((error) => setError(error.message));
+            .catch((error: unknown) =>
+                setError(error instanceof Error ? error.message : String(error))
+            );
     }, []);
 
-    function handleSubmit(event) {
+    function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
         event.preventDefault();
         setError("");
         setResult(null);
+
+        if (!simulate) return;
+
         const form = new FormData(event.currentTarget);
         try {
             setResult(
                 simulate({
-                    message: form.get("message"),
-                    domain: form.get("domain"),
-                    recordType: form.get("recordType"),
+                    message: String(form.get("message") ?? ""),
+                    domain: String(form.get("domain") ?? ""),
+                    recordType: String(form.get("recordType") ?? ""),
                     partSize: Number(form.get("partSize"))
                 })
             );
         } catch (error) {
-            setError(error.message);
+            setError(error instanceof Error ? error.message : String(error));
         }
     }
 
@@ -131,7 +136,7 @@ function App() {
                         ))}
                     </div>
                     <h3 className="text-sm font-medium">Recovered message</h3>
-                    <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-sm">
+                    <pre className="mt-2 whitespace-pre-wrap wrap-break-word font-mono text-sm">
                         {result.message || "(empty)"}
                     </pre>
                 </section>
@@ -140,4 +145,6 @@ function App() {
     );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+const root = document.getElementById("root");
+if (!root) throw new Error("Missing application root.");
+createRoot(root).render(<App />);

@@ -65,7 +65,7 @@ the page after a successful rebuild. A Go rebuild resets the form. The matching
 ```sh
 bun run build    # Build frontend and WASM into web/dist
 bun run preview  # Preview the production build
-bun run check    # Frontend formatting and lint
+bun run check    # Frontend formatting, lint, and TypeScript checks
 bun test         # Real Go WASM round-trip tests
 ```
 
