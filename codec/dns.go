@@ -1,63 +1,50 @@
 package codec
 
 import (
+	"encoding/base64"
 	"errors"
-	"net"
-	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-// Encode encodes the given data into a DNS message with a TXT record. The data is split into chunks of up to 255 bytes,
-// as per the DNS TXT record specification. If the data exceeds the maximum allowed size for a DNS message, an error is
-// returned. The function returns the encoded DNS message or an error if encoding fails.
-func Encode(data []byte) (message []byte, err error) {
-	const maxPayload = 65256 // Leaves room for the DNS header, TXT header, and string lengths.
-	if len(data) > maxPayload {
-		err = errors.New("data exceeds maximum DNS message size")
-		return
-	}
-
-	var (
-		chunks  int      = max(1, (len(data)+254)/255)
-		txt     []string = make([]string, chunks)
-		payload string   = string(data)
-	)
-
-	for i := range txt {
-		var n int = min(len(payload), 255)
-		txt[i] = payload[:n]
-		payload = payload[n:]
-	}
-
-	var b dnsmessage.Builder = dnsmessage.NewBuilder(make([]byte, 0, 23+len(data)+chunks), dnsmessage.Header{})
-	if err = b.StartAdditionals(); err != nil {
-		return
-	}
-
-	if err = b.TXTResource(dnsmessage.ResourceHeader{
-		Name:  dnsmessage.MustNewName("."),
-		Class: dnsmessage.ClassINET,
-	}, dnsmessage.TXTResource{
-		TXT: txt,
-	}); err != nil {
-		return
-	}
-
-	message, err = b.Finish()
-	return
+type EncodeableType struct {
+	RecordType       dnsmessage.Type
+	MaxPayloadLength int
 }
 
-// EncodeARecord encodes a DNS A record query for the given domain name. It constructs a DNS message with the specified
-// domain name and returns the encoded message or an error if encoding fails. The function checks for valid domain name
-// length and format before proceeding with the encoding.
-func EncodeARecord(name string) (message []byte, err error) {
-	if name == "" || len(name) > 253 {
-		err = errors.New("invalid domain name")
+var EncodeableTypes = map[dnsmessage.Type]EncodeableType{
+	dnsmessage.TypeA: {
+		RecordType:       dnsmessage.TypeA,
+		MaxPayloadLength: 253,
+	},
+	dnsmessage.TypeAAAA: {
+		RecordType:       dnsmessage.TypeAAAA,
+		MaxPayloadLength: 253,
+	},
+	dnsmessage.TypeTXT: {
+		RecordType:       dnsmessage.TypeTXT,
+		MaxPayloadLength: 65256,
+	},
+}
+
+// Encodes a DNS query message, turning the data into base64 and encoding it in an appropriate DNS record type.
+func Encode(recordType dnsmessage.Type, data []byte) (message []byte, err error) {
+	var (
+		encodeableType EncodeableType
+		ok             bool
+	)
+
+	if encodeableType, ok = EncodeableTypes[recordType]; !ok {
+		err = errors.New("unsupported record type")
 		return
 	}
 
-	var b dnsmessage.Builder = dnsmessage.NewBuilder(make([]byte, 0, 23+len(name)), dnsmessage.Header{
+	if len(data) > encodeableType.MaxPayloadLength {
+		err = errors.New("data exceeds maximum payload length for the specified record type")
+		return
+	}
+
+	var b dnsmessage.Builder = dnsmessage.NewBuilder(make([]byte, 0, 23+len(data)), dnsmessage.Header{
 		RecursionDesired: true,
 	})
 
@@ -65,53 +52,97 @@ func EncodeARecord(name string) (message []byte, err error) {
 		return
 	}
 
+	var name string = "."
+	if encodeableType.RecordType == dnsmessage.TypeA || encodeableType.RecordType == dnsmessage.TypeAAAA {
+		name = base64.RawURLEncoding.EncodeToString(data) + "."
+	}
+
 	if err = b.Question(dnsmessage.Question{
-		Name:  dnsmessage.MustNewName(name + "."),
-		Type:  dnsmessage.TypeA,
+		Name:  dnsmessage.MustNewName(name),
+		Type:  encodeableType.RecordType,
 		Class: dnsmessage.ClassINET,
 	}); err != nil {
 		return
 	}
 
-	message, err = b.Finish()
+	if encodeableType.RecordType == dnsmessage.TypeTXT {
+		var (
+			chunks  int      = max(1, (len(data)+254)/255)
+			txt     []string = make([]string, chunks)
+			payload string   = string(data)
+		)
+
+		for i := range txt {
+			var n int = min(len(payload), 255)
+			txt[i] = payload[:n]
+			payload = payload[n:]
+		}
+
+		if err = b.StartAdditionals(); err != nil {
+			return
+		}
+
+		if err = b.TXTResource(dnsmessage.ResourceHeader{
+			Name:  dnsmessage.MustNewName("."),
+			Class: dnsmessage.ClassINET,
+		}, dnsmessage.TXTResource{
+			TXT: txt,
+		}); err != nil {
+			return
+		}
+	}
+
 	return
 }
 
-// SendMessageToDNSServerAndGetResponse sends a DNS message to the specified DNS server and waits for a response. It handles
-// the connection setup, message sending, and response reading. The function returns the decoded DNS response message or an
-// error if any step in the process fails. It uses a timeout to avoid indefinite blocking during network operations.
-func SendMessageToDNSServerAndGetResponse(message []byte, server string) (resp dnsmessage.Message, err error) {
-	if _, _, err = net.SplitHostPort(server); err != nil {
-		server = net.JoinHostPort(server, "53")
-	}
-
-	const timeout = 5 * time.Second
-	var conn net.Conn
-
-	if conn, err = net.DialTimeout("udp", server, timeout); err != nil {
+// Decode decodes a DNS response message, extracting
+func Decode(message []byte) (recordType dnsmessage.Type, data []byte, err error) {
+	var resp dnsmessage.Message
+	if err = resp.Unpack(message); err != nil {
 		return
 	}
 
-	defer conn.Close()
-
-	if err = conn.SetDeadline(time.Now().Add(timeout)); err != nil {
-		return
-	}
-
-	if _, err = conn.Write(message); err != nil {
+	if len(resp.Answers) == 0 {
+		err = errors.New("no answers in DNS response")
 		return
 	}
 
 	var (
-		response []byte = make([]byte, 65535)
-		n        int
+		answer dnsmessage.Resource
+		ok     bool
 	)
 
-	if n, err = conn.Read(response); err != nil {
-		return
+	answer = resp.Answers[0]
+	recordType = answer.Header.Type
+
+	switch recordType {
+	case dnsmessage.TypeA:
+		var aRecord *dnsmessage.AResource
+		if aRecord, ok = answer.Body.(*dnsmessage.AResource); ok {
+			data = aRecord.A[:]
+		} else {
+			err = errors.New("failed to decode A record")
+		}
+	case dnsmessage.TypeAAAA:
+		var aaaaRecord *dnsmessage.AAAAResource
+		if aaaaRecord, ok = answer.Body.(*dnsmessage.AAAAResource); ok {
+			data = aaaaRecord.AAAA[:]
+		} else {
+			err = errors.New("failed to decode AAAA record")
+		}
+	case dnsmessage.TypeTXT:
+		var txtRecord *dnsmessage.TXTResource
+		if txtRecord, ok = answer.Body.(*dnsmessage.TXTResource); ok {
+			data = []byte{}
+			for _, txt := range txtRecord.TXT {
+				data = append(data, []byte(txt)...)
+			}
+		} else {
+			err = errors.New("failed to decode TXT record")
+		}
+	default:
+		err = errors.New("unsupported record type in DNS response")
 	}
 
-	response = response[:n]
-	err = resp.Unpack(response)
 	return
 }

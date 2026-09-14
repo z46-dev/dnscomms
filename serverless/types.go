@@ -7,6 +7,8 @@ type (
 
 	Client struct{}
 
+	DNSServerForwarder struct {}
+
 	DNSServer struct{}
 
 	PacketCapture struct{}
