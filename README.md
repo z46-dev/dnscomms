@@ -40,3 +40,7 @@ if err = client.Exfiltrate([]byte("Hello, World!")); err != nil {
     log.Fatal(err)
 }
 ```
+
+## Learning Utility
+
+This is also a learning utility provided in the form of a web app. It shows the relationship between the exfiltrating client, the server, and provides the ability to get a packet capture of the DNS queries being sent out.
