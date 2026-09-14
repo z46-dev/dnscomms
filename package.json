@@ -1,0 +1,24 @@
+{
+    "name": "dnscomms",
+    "private": true,
+    "type": "module",
+    "packageManager": "bun@1.3.5",
+    "scripts": {
+        "dev": "bun --bun vite",
+        "build": "bun --bun vite build",
+        "preview": "bun --bun vite preview",
+        "check": "biome check biome.json package.json web/app web/index.html web/vite-wasm.js web/wasm.test.js vite.config.js",
+        "test": "bun test web/wasm.test.js"
+    },
+    "dependencies": {
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.0",
+        "@tailwindcss/vite": "^4.2.0",
+        "@vitejs/plugin-react": "^5.1.0",
+        "tailwindcss": "^4.2.0",
+        "vite": "^7.3.0"
+    }
+}

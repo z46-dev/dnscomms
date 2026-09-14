@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@layer base {
+    .page {
+        @apply m-0 bg-stone-50 font-sans text-stone-900 antialiased;
+    }
+}
+
+@layer components {
+    .field-label {
+        @apply text-sm font-medium;
+    }
+
+    .form-control {
+        @apply rounded border border-stone-300 bg-white px-3 py-2 text-sm font-normal;
+    }
+}
+
+@layer utilities {
+    .focus-ring:focus-visible {
+        @apply outline-2 outline-offset-2 outline-stone-600;
+    }
+}

@@ -44,3 +44,29 @@ if err = client.Exfiltrate([]byte("Hello, World!")); err != nil {
 ## Learning Utility
 
 This is also a learning utility provided in the form of a web app. It shows the relationship between the exfiltrating client, the server, and provides the ability to get a packet capture of the DNS queries being sent out.
+## Web simulator
+
+Requires Go (the version in `go.mod` or newer) and Bun 1.3.5+.
+
+```sh
+bun install
+bun run dev
+```
+
+Open the URL printed by Vite. React and Tailwind render a small local simulator;
+Go WASM uses the existing codecs to encode DNS responses and recover the message.
+The network simulator is not implemented yet; this screen performs an in-memory
+codec round trip and sends no DNS traffic.
+
+Vite builds WASM before serving, watches Go files and `go.mod`/`go.sum`, and reloads
+the page after a successful rebuild. A Go rebuild resets the form. The matching
+`wasm_exec.js` comes from the active Go installation. Generated files are ignored.
+
+```sh
+bun run build    # Build frontend and WASM into web/dist
+bun run preview  # Preview the production build
+bun run check    # Frontend formatting and lint
+bun test         # Real Go WASM round-trip tests
+```
+
+GitHub Actions runs these checks alongside Go formatting, vet, tests, and builds.

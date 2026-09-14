@@ -1,3 +1,4 @@
-#!/bin/bash
-
-GOOS=js GOARCH=wasm go build -o ./web/public/main.wasm ./web/src
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+bun run build

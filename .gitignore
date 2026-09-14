@@ -30,3 +30,9 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Frontend dependencies and generated assets
+node_modules/
+web/dist/
+web/public/main.wasm
+web/public/wasm_exec.js

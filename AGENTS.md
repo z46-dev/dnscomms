@@ -8,6 +8,8 @@ These are mandatory coding rules & guidelines for all code in this repository.
 2. Writing tests for the fun of it is not a good idea. Write tests for important broad things, not for every single function. If you find yourself writing a test for a function that is not important, consider if the function is even necessary.
 3. We should ensure that our entire test plan can be ran inside a GitHub Actions workflow. We can use the Go installable module nektos/act to run the workflow locally. We should run tests, code quality checks, and builds in the workflow.
 4. Do not leave dev servers running. Always terminate running processes unless asked to run one after.
+5. Indent spaces should be 4 spaces.
+6. Avoid trailing commas/whitespace when the language supports it. For example, in Go, trailing commas are required in multi-line composite literals, but not in single-line ones. In JavaScript, trailing commas are not needed.
 
 ## Go Coding Rules
 
@@ -70,3 +72,22 @@ func main() {
     something = nil
 }
 ```
+
+## JavaScript/TypeScript, HTML, and CSS Rules
+
+Mandatory frontend coding guidelines:
+
+1. Keep JavaScript modules focused; split files when they contain unrelated responsibilities
+2. Prefer clear, descriptive names over abbreviations
+3. Use `const` by default and `let` only when reassignment is required; do not use `var`
+4. Keep functions small and avoid deeply nested control flow
+5. Reuse shared components, helpers, and styles instead of duplicating behavior or declarations
+6. Use semantic HTML elements and preserve keyboard accessibility
+7. Keep HTML structure minimal; avoid wrapper elements that do not provide layout, styling, or semantic value
+8. Keep CSS selectors shallow and class-based; avoid IDs and excessive specificity for styling
+9. Group related CSS declarations consistently and use existing design tokens or custom properties
+10. Build responsive layouts intentionally and avoid hard-coded dimensions unless the design requires them
+11. Remove unused JavaScript, markup, selectors, and assets when changing related code
+12. Optimize for readability, accessibility, maintainability, and browser performance
+13. Split large CSS files into smaller tailwind layers or component-specific files when they contain unrelated responsibilities
+14. Ensure a clean structure of HTML, CSS, and JavaScript files.
