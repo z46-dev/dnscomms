@@ -39,48 +39,61 @@ func Encode(data []byte) ([]byte, error) {
 	return b.Finish()
 }
 
-func EncodeARecord(name string) ([]byte, error) {
+func EncodeARecord(name string) (message []byte, err error) {
 	if name == "" || len(name) > 253 {
-		return nil, errors.New("invalid domain name")
+		err = errors.New("invalid domain name")
+		return
 	}
 
-	b := dnsmessage.NewBuilder(make([]byte, 0, 23+len(name)), dnsmessage.Header{RecursionDesired: true})
-	if err := b.StartQuestions(); err != nil {
-		return nil, err
+	var b dnsmessage.Builder = dnsmessage.NewBuilder(make([]byte, 0, 23+len(name)), dnsmessage.Header{RecursionDesired: true})
+	if err = b.StartQuestions(); err != nil {
+		return
 	}
-	if err := b.Question(dnsmessage.Question{
+
+	if err = b.Question(dnsmessage.Question{
 		Name:  dnsmessage.MustNewName(name + "."),
 		Type:  dnsmessage.TypeA,
 		Class: dnsmessage.ClassINET,
 	}); err != nil {
-		return nil, err
+		return
 	}
-	return b.Finish()
+
+	message, err = b.Finish()
+	return
 }
 
-func SendMessageToDNSServerAndGetResponse(message []byte, server string) ([]byte, error) {
-	if _, _, err := net.SplitHostPort(server); err != nil {
+func SendMessageToDNSServerAndGetResponse(message []byte, server string) (resp dnsmessage.Message, err error) {
+	if _, _, err = net.SplitHostPort(server); err != nil {
 		server = net.JoinHostPort(server, "53")
 	}
 
 	const timeout = 5 * time.Second
-	conn, err := net.DialTimeout("udp", server, timeout)
-	if err != nil {
-		return nil, err
+	var conn net.Conn
+
+	if conn, err = net.DialTimeout("udp", server, timeout); err != nil {
+		return
 	}
+
 	defer conn.Close()
 
-	if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
-		return nil, err
-	}
-	if _, err := conn.Write(message); err != nil {
-		return nil, err
+	if err = conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+		return
 	}
 
-	response := make([]byte, 65535)
-	n, err := conn.Read(response)
-	if err != nil {
-		return nil, err
+	if _, err = conn.Write(message); err != nil {
+		return
 	}
-	return response[:n], nil
+
+	var (
+		response []byte = make([]byte, 65535)
+		n        int
+	)
+
+	if n, err = conn.Read(response); err != nil {
+		return
+	}
+
+	response = response[:n]
+	err = resp.Unpack(response)
+	return
 }
