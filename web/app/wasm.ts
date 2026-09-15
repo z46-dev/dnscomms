@@ -1,19 +1,93 @@
-export interface SimulationInput {
-    message: string;
-    domain: string;
-    recordType: string;
-    partSize: number;
+export interface Server {
+    id: string;
+    poisoned: boolean;
+    forwardTo: string;
 }
-
-export interface SimulationResult {
-    packets: { bytes: number; hex: string }[];
+export interface Part {
+    id: string;
+    sequence: number;
+    total: number;
+    bodyBytes: number;
+    flags: number;
+}
+export interface PacketEvent {
+    trafficLabel?: string;
+    packetId: number;
+    client: string;
+    server: string;
+    id: number;
+    time: number;
+    source: string;
+    destination: string;
+    direction: string;
+    type: string;
+    name: string;
+    classification: string;
+    outcome: string;
+    bytes: number;
+    hex: string;
+    dns: unknown;
+    part?: Part;
+}
+export interface Transfer {
+    id: string;
+    expected: number;
+    received: number;
+    sent: number;
+    missing: number[];
+    sources: string[];
+    status: string;
     message: string;
     inputBytes: number;
-    wireBytes: number;
+    requests: {
+        sequence: number;
+        target: string;
+        type: string;
+        due: number;
+        status: string;
+        bytes: number;
+    }[];
+}
+export interface Simulation {
+    trafficFrequency: number;
+    evilCover: boolean;
+    liveDNS: boolean;
+    resolving: number;
+    packets: {
+        id: number;
+        source: string;
+        destination: string;
+        client: string;
+        server: string;
+        direction: string;
+        classification: string;
+        progress: number;
+    }[];
+    time: number;
+    playing: boolean;
+    speed: number;
+    servers: Server[];
+    events: PacketEvent[];
+    transfers: Transfer[];
+    active: boolean;
+    dropped: number;
     error?: string;
 }
-
-export type Simulator = (input: SimulationInput) => SimulationResult;
+export interface Command {
+    trafficFrequency?: number;
+    evilCover?: boolean;
+    action: "state" | "send" | "configure" | "tick" | "playback" | "reset";
+    message?: string;
+    targets?: string[];
+    types?: string[];
+    duration?: number;
+    vary?: boolean;
+    servers?: Server[];
+    delta?: number;
+    playing?: boolean;
+    speed?: number;
+}
+export type Simulator = (input: Command) => Simulation;
 
 let runtime: Promise<Simulator> | undefined;
 
@@ -36,8 +110,10 @@ export function loadSimulator(): Promise<Simulator> {
             throw new Error("Simulator failed to start.");
         }
 
-        return (input: SimulationInput) => {
-            const result: SimulationResult = JSON.parse(globalThis.dnscommsSimulate(JSON.stringify(input)));
+        return (input: Command) => {
+            const result: Simulation = JSON.parse(
+                globalThis.dnscommsSimulate(JSON.stringify(input))
+            );
 
             if (result.error) {
                 throw new Error(result.error);

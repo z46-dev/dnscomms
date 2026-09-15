@@ -1,39 +1,89 @@
 import { beforeAll, expect, test } from "bun:test";
-import type { SimulationResult } from "./app/wasm";
+import type { Command, Simulation } from "./app/wasm";
 import { buildWasm } from "./vite-wasm";
 
 beforeAll(async () => {
     buildWasm();
-    await import(/* @vite-ignore */ new URL("./public/wasm_exec.js", import.meta.url).href);
+    await import(
+        /* @vite-ignore */ new URL("./public/wasm_exec.js", import.meta.url)
+            .href
+    );
     const go = new Go();
-    const { instance } = await WebAssembly.instantiate(await Bun.file(new URL("./public/main.wasm", import.meta.url)).arrayBuffer(), go.importObject);
+    const { instance } = await WebAssembly.instantiate(
+        await Bun.file(
+            new URL("./public/main.wasm", import.meta.url)
+        ).arrayBuffer(),
+        go.importObject
+    );
     void go.run(instance);
 });
 
-for (const recordType of ["TXT", "A", "AAAA"]) {
-    test(`${recordType} round-trips multipart UTF-8 through Go WASM`, () => {
-        const message = "Hello, 世界! ".repeat(30);
-        const result: SimulationResult = JSON.parse(globalThis.dnscommsSimulate(JSON.stringify({
-            message: message,
-            domain: "example.com",
-            recordType: recordType,
-            partSize: 128
-        })));
+function run(command: Command): Simulation {
+    return JSON.parse(globalThis.dnscommsSimulate(JSON.stringify(command)));
+}
 
-        expect(result.error).toBeUndefined();
-        expect(result.message).toBe(message);
-        expect(result.inputBytes).toBe(new TextEncoder().encode(message).length);
-        expect(result.packets.length).toBeGreaterThan(1);
-        expect(result.wireBytes).toBe(result.packets.reduce((sum, packet) => sum + packet.bytes, 0));
+for (const type of ["TXT", "A", "AAAA"]) {
+    test(`${type} transfers UTF-8 through the real Go WASM network`, () => {
+        run({ action: "reset" });
+        run({ action: "configure", trafficFrequency: 0 });
+        const message = "Hello, 世界! ".repeat(30);
+        const initial = run({
+            action: "send",
+            message,
+            types: [type],
+            targets: ["dns-1"],
+            duration: 2,
+            vary: true
+        });
+        expect(initial.error).toBeUndefined();
+        expect(initial.transfers[0]?.status).toBe("sending");
+        run({ action: "tick", delta: 1 });
+        for (let tick = 0; tick < 4; tick++) run({ action: "tick", delta: 1 });
+        const result = run({ action: "tick", delta: 1 });
+        expect(result.transfers[0]?.message).toBe(message);
+        expect(result.transfers[0]?.status).toBe("complete");
+        expect(result.transfers[0]?.inputBytes).toBe(
+            new TextEncoder().encode(message).length
+        );
+        expect(
+            result.events.filter(
+                (event) => event.classification === "forwarded part"
+            ).length
+        ).toBe(result.transfers[0]?.expected ?? 0);
     });
 }
 
-test("invalid requests report errors without stopping the runtime", () => {
-    expect(JSON.parse(globalThis.dnscommsSimulate("{broken")).error).toBeTruthy();
-    expect(JSON.parse(globalThis.dnscommsSimulate(JSON.stringify({
-        message: "",
-        domain: "example.com",
-        recordType: "TXT",
-        partSize: 256
-    }))).message).toBe("");
+test("normal routing, paused playback and invalid commands preserve runtime integrity", () => {
+    run({ action: "reset" });
+    run({ action: "configure", trafficFrequency: 0 });
+    run({
+        action: "send",
+        message: "Lost message",
+        targets: ["dns-2"],
+        types: ["A"],
+        duration: 1
+    });
+    run({ action: "playback", playing: false, speed: 1 });
+    expect(run({ action: "tick", delta: 1 }).time).toBe(0);
+    run({ action: "playback", playing: true, speed: 1 });
+    for (let tick = 0; tick < 4; tick++) run({ action: "tick", delta: 1 });
+    const result = run({ action: "tick", delta: 1 });
+    expect(result.transfers[0]?.status).toBe("incomplete");
+    expect(result.transfers[0]?.message).toBe("");
+    expect(
+        result.events.some((event) => event.outcome.includes("NXDOMAIN"))
+    ).toBe(true);
+    expect(
+        JSON.parse(globalThis.dnscommsSimulate("{broken")).error
+    ).toBeTruthy();
+    expect(
+        run({
+            action: "send",
+            message: "",
+            targets: ["dns-1"],
+            types: ["TXT"],
+            duration: 1
+        }).error
+    ).toBeTruthy();
+    expect(run({ action: "state" }).transfers).toHaveLength(1);
 });

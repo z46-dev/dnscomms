@@ -41,3 +41,4 @@ Every hop emits a structured event with an ID, timestamp or simulation tick, sou
 - Both ordinary clients continually make DNS requests and receive valid simulated replies from normal and poisoned servers.
 - Server count and poisoned identity can be changed between runs; the map and controls stay in sync.
 - Tabs, controls, packet details, and status remain usable with keyboard input, on narrow screens, and with reduced motion.
+- No excessive lines of code or unmaintainable hacks; the simulation is a clean, testable Go/WASM implementation with a React interface. We should strive for a clean minimalistic UI that does not fall into common AI-generated design pitfalls. The simulation should be understandable and usable by someone with a basic understanding of DNS and network traffic, without requiring deep technical knowledge or many tooltips littering the design.

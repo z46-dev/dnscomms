@@ -13,19 +13,29 @@ export function buildWasm() {
         recursive: true
     });
 
-    execFileSync("go", ["build", "-o", join(output, "main.wasm"), "./web/src"], {
-        cwd: root,
-        env: {
-            ...process.env,
-            GOOS: "js",
-            GOARCH: "wasm"
-        },
-        stdio: "pipe"
-    });
+    execFileSync(
+        "go",
+        ["build", "-o", join(output, "main.wasm"), "./web/src"],
+        {
+            cwd: root,
+            env: {
+                ...process.env,
+                GOOS: "js",
+                GOARCH: "wasm"
+            },
+            stdio: "pipe"
+        }
+    );
 
-    copyFileSync(join(execFileSync("go", ["env", "GOROOT"], {
-        encoding: "utf8"
-    }).trim(), "lib/wasm/wasm_exec.js"), join(output, "wasm_exec.js"));
+    copyFileSync(
+        join(
+            execFileSync("go", ["env", "GOROOT"], {
+                encoding: "utf8"
+            }).trim(),
+            "lib/wasm/wasm_exec.js"
+        ),
+        join(output, "wasm_exec.js")
+    );
 }
 
 export function goWasm(): Plugin {
@@ -38,7 +48,10 @@ export function goWasm(): Plugin {
         configureServer(server) {
             server.watcher.add(root);
             const onChange = (_event: string, file: string) => {
-                if (!file.endsWith(".go") && !["go.mod", "go.sum"].includes(basename(file))) {
+                if (
+                    !file.endsWith(".go") &&
+                    !["go.mod", "go.sum"].includes(basename(file))
+                ) {
                     return;
                 }
 
@@ -50,7 +63,12 @@ export function goWasm(): Plugin {
                             type: "full-reload"
                         });
                     } catch (error) {
-                        const message = error instanceof Error ? "stderr" in error ? String(error.stderr || error.message) : error.message : String(error);
+                        const message =
+                            error instanceof Error
+                                ? "stderr" in error
+                                    ? String(error.stderr || error.message)
+                                    : error.message
+                                : String(error);
                         server.config.logger.error(message);
                         server.ws.send({
                             type: "error",

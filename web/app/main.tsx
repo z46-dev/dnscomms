@@ -1,146 +1,228 @@
-import { type SubmitEvent, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { loadSimulator, type SimulationResult, type Simulator } from "./wasm";
+import { Capture } from "./capture";
+import { Config } from "./config";
+import { Exfil } from "./panels";
+import {
+    type Command,
+    loadSimulator,
+    type Simulation,
+    type Simulator
+} from "./wasm";
 import "./style.css";
 
+const tabs = ["DNS Exfil", "Packet capture", "Config"];
+
 function App() {
-    const [simulate, setSimulate] = useState<Simulator | null>(null);
+    const [simulator, setSimulator] = useState<Simulator | null>(null);
+    const [state, setState] = useState<Simulation | null>(null);
     const [error, setError] = useState("");
-    const [result, setResult] = useState<SimulationResult | null>(null);
+    const [tab, setTab] = useState(0);
+    const [generation, setGeneration] = useState(0);
+    const command = useCallback(
+        (input: Command) => {
+            if (!simulator) return;
+            try {
+                setState(simulator(input));
+                if (input.action === "reset")
+                    setGeneration((value) => value + 1);
+                setError("");
+            } catch (error) {
+                setError(
+                    error instanceof Error ? error.message : String(error)
+                );
+            }
+        },
+        [simulator]
+    );
 
     useEffect(() => {
         void loadSimulator()
-            .then((simulateMessage) => setSimulate(() => simulateMessage))
-            .catch((error: unknown) =>
-                setError(error instanceof Error ? error.message : String(error))
-            );
+            .then((run) => {
+                setSimulator(() => run);
+                setState(run({ action: "state" }));
+            })
+            .catch((error: unknown) => setError(String(error)));
     }, []);
 
-    function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
-        event.preventDefault();
-        setError("");
-        setResult(null);
+    useEffect(() => {
+        if (!simulator) return;
+        const preference = matchMedia("(prefers-reduced-motion: reduce)");
+        const attach = () => {
+            const error = globalThis.dnscommsCanvas(preference.matches);
+            if (error) setError(error);
+        };
+        attach();
+        preference.addEventListener("change", attach);
+        const timer = setInterval(() => {
+            setState(simulator({ action: "state" }));
+        }, 100);
+        return () => {
+            clearInterval(timer);
+            preference.removeEventListener("change", attach);
+        };
+    }, [simulator]);
 
-        if (!simulate) return;
-
-        const form = new FormData(event.currentTarget);
-        try {
-            setResult(
-                simulate({
-                    message: String(form.get("message") ?? ""),
-                    domain: String(form.get("domain") ?? ""),
-                    recordType: String(form.get("recordType") ?? ""),
-                    partSize: Number(form.get("partSize"))
-                })
-            );
-        } catch (error) {
-            setError(error instanceof Error ? error.message : String(error));
-        }
-    }
-
+    const latest = state?.events.at(-1);
     return (
-        <main className="mx-auto max-w-3xl px-5 py-10 sm:py-16">
-            <header className="mb-10 flex items-baseline justify-between border-b border-stone-300 pb-4">
-                <h1 className="text-xl font-semibold tracking-tight">
-                    dnscomms
-                </h1>
-                <span className="text-sm text-stone-500">Local simulation</span>
+        <main>
+            <header>
+                <div>
+                    <h1>DNS network activity</h1>
+                    <p>Follow a message through a simulated network.</p>
+                </div>
+                <span role="status">
+                    {state
+                        ? `${state.playing ? "Running" : "Paused"} · ${state.time.toFixed(1)}s`
+                        : "Loading…"}
+                </span>
             </header>
-            <form onSubmit={handleSubmit} className="space-y-5">
-                <label className="field-label block">
-                    Message
-                    <textarea
-                        name="message"
-                        defaultValue="Hello, World!"
-                        rows={4}
-                        maxLength={16384}
-                        className="form-control focus-ring mt-2 block w-full resize-y font-mono"
-                    />
-                </label>
-                <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
-                    <label className="field-label">
-                        Domain
-                        <input
-                            name="domain"
-                            defaultValue="example.com"
-                            required
-                            className="form-control focus-ring mt-2 block w-full"
-                        />
-                    </label>
-                    <label className="field-label">
-                        Record
-                        <select
-                            name="recordType"
-                            className="form-control focus-ring mt-2 block w-full"
-                        >
-                            <option>TXT</option>
-                            <option>A</option>
-                            <option>AAAA</option>
-                        </select>
-                    </label>
-                    <label className="field-label">
-                        Frame bytes
-                        <input
-                            name="partSize"
-                            type="number"
-                            defaultValue={256}
-                            min={128}
-                            max={1024}
-                            required
-                            className="form-control focus-ring mt-2 block w-full"
-                        />
-                    </label>
-                </div>
-                <div className="flex flex-wrap items-center gap-4">
-                    <button
-                        type="submit"
-                        disabled={!simulate}
-                        className="focus-ring rounded bg-stone-900 px-4 py-2 text-white hover:bg-stone-700 disabled:opacity-40"
-                    >
-                        {simulate ? "Run simulation" : "Loading…"}
-                    </button>
-                    <p className="text-sm text-stone-500">
-                        Runs in your browser. No DNS traffic is sent.
-                    </p>
-                </div>
-            </form>
             {error && (
-                <p role="alert" className="mt-6 text-sm text-red-700">
+                <p role="alert" className="error">
                     {error}
                 </p>
             )}
-            {result && (
+            <div className="workspace">
                 <section
-                    aria-label="Simulation result"
-                    className="mt-10 border-t border-stone-300 pt-6"
+                    className="inspection"
+                    aria-label="Controls and inspection"
                 >
-                    <h2 className="font-medium">Result</h2>
-                    <p role="status" className="mt-2 text-sm text-stone-600">
-                        {result.inputBytes} input bytes ·{" "}
-                        {result.packets.length} DNS responses ·{" "}
-                        {result.wireBytes} DNS bytes
-                    </p>
-                    <div className="my-5 divide-y divide-stone-200 border-y border-stone-200">
-                        {result.packets.map((packet, index) => (
-                            <details key={packet.hex} className="py-3">
-                                <summary className="focus-ring cursor-pointer text-sm">
-                                    Packet {index + 1}
-                                    <span className="ml-3 text-stone-500">
-                                        {packet.bytes} bytes
-                                    </span>
-                                </summary>
-                                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-stone-600">
-                                    {packet.hex}
-                                </pre>
-                            </details>
+                    <div
+                        role="tablist"
+                        aria-label="Inspection views"
+                        className="tabs"
+                    >
+                        {tabs.map((name, index) => (
+                            <button
+                                key={name}
+                                type="button"
+                                role="tab"
+                                id={`tab-${index}`}
+                                aria-controls={`panel-${index}`}
+                                aria-selected={tab === index}
+                                tabIndex={tab === index ? 0 : -1}
+                                onClick={() => setTab(index)}
+                                onKeyDown={(event) => {
+                                    let next = index;
+                                    if (event.key === "ArrowRight")
+                                        next = (index + 1) % tabs.length;
+                                    else if (event.key === "ArrowLeft")
+                                        next =
+                                            (index + tabs.length - 1) %
+                                            tabs.length;
+                                    else if (event.key === "Home") next = 0;
+                                    else if (event.key === "End")
+                                        next = tabs.length - 1;
+                                    else return;
+                                    event.preventDefault();
+                                    setTab(next);
+                                    document
+                                        .getElementById(`tab-${next}`)
+                                        ?.focus();
+                                }}
+                            >
+                                {name}
+                            </button>
                         ))}
                     </div>
-                    <h3 className="text-sm font-medium">Recovered message</h3>
-                    <pre className="mt-2 whitespace-pre-wrap wrap-break-word font-mono text-sm">
-                        {result.message || "(empty)"}
-                    </pre>
+                    {state &&
+                        tabs.map((name, index) => (
+                            <section
+                                key={name}
+                                role="tabpanel"
+                                id={`panel-${index}`}
+                                aria-labelledby={`tab-${index}`}
+                                hidden={tab !== index}
+                            >
+                                {index === 0 && (
+                                    <Exfil state={state} command={command} />
+                                )}
+                                {index === 1 && (
+                                    <Capture
+                                        key={generation}
+                                        events={state.events}
+                                        dropped={state.dropped}
+                                    />
+                                )}
+                                {index === 2 && (
+                                    <Config state={state} command={command} />
+                                )}
+                            </section>
+                        ))}
                 </section>
-            )}
+                <aside aria-label="Live network" className="network">
+                    <h2>Network</h2>
+                    <div className="toolbar">
+                        <button
+                            type="button"
+                            disabled={!state}
+                            onClick={() =>
+                                command({
+                                    action: "playback",
+                                    playing: !state?.playing,
+                                    speed: state?.speed
+                                })
+                            }
+                        >
+                            {state?.playing ? "Pause" : "Play"}
+                        </button>
+                        <label>
+                            Speed{" "}
+                            <select
+                                value={state?.speed ?? 1}
+                                onChange={(event) =>
+                                    command({
+                                        action: "playback",
+                                        playing: state?.playing,
+                                        speed: Number(event.target.value)
+                                    })
+                                }
+                            >
+                                {[0.5, 1, 2, 4].map((speed) => (
+                                    <option key={speed} value={speed}>
+                                        {speed}×
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => command({ action: "reset" })}
+                        >
+                            Reset
+                        </button>
+                    </div>
+                    <canvas
+                        id="network-map"
+                        aria-label="Three inside clients, a firewall, DNS servers and an outside orchestrator. Traffic travels through the firewall device. Packet activity is listed below and in Packet capture."
+                    />
+                    <ul className="legend">
+                        <li className="ordinary">Regular DNS ↓</li>
+                        <li className="exfil">Exfil DNS ↓</li>
+                        <li className="response">Response ↑</li>
+                        <li className="forward">Forwarded part ↓</li>
+                    </ul>
+                    <p className="event-summary">
+                        {latest
+                            ? `#${latest.id} ${latest.source} → ${latest.destination}: ${latest.classification}. ${latest.outcome}.`
+                            : "Waiting for the first DNS request."}
+                    </p>
+                    <p>
+                        {(state?.events.length ?? 0) + (state?.dropped ?? 0)}{" "}
+                        captured hops · {state?.packets.length ?? 0} in flight ·{" "}
+                        {state?.resolving ?? 0} resolving ·{" "}
+                        {state?.transfers.filter(
+                            (transfer) => transfer.status === "complete"
+                        ).length ?? 0}{" "}
+                        recovered transfers
+                    </p>
+                    <p className="muted">
+                        Regular queries use Cloudflare DNS over HTTPS. Your
+                        exfil message stays in the browser. Reset clears the
+                        activity.
+                    </p>
+                </aside>
+            </div>
         </main>
     );
 }

@@ -1,0 +1,132 @@
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.section-heading h2,
+.section-heading h3 {
+    margin: 0;
+}
+.section-heading h3 {
+    font-family: monospace;
+    font-size: 13px;
+}
+.eyebrow {
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+}
+.send-section {
+    padding: 26px 0;
+}
+.send-section form {
+    margin-top: 20px;
+}
+.send-options {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 20px;
+}
+.send-options fieldset {
+    border: 0;
+    padding: 0;
+    margin: 16px 0;
+}
+.send-options legend {
+    padding: 0;
+    margin-bottom: 12px;
+    color: var(--muted);
+}
+.send-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 18px;
+}
+.send-footer .primary {
+    margin-left: auto;
+}
+.inbox {
+    padding: 24px 0;
+    border-top: 1px solid var(--border);
+}
+.transfer {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+}
+.transfer progress {
+    margin-top: 14px;
+}
+.transfer details {
+    font-size: 13px;
+}
+.recovered {
+    background: transparent;
+    padding: 12px 0;
+    font-size: 14px;
+}
+.config-section {
+    padding: 20px 0;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+}
+.config-section legend {
+    padding: 0;
+    font-weight: 600;
+}
+.config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: center;
+}
+.config-grid select {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+}
+.config-grid input[type="range"] {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+}
+.range-value {
+    display: block;
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 12px;
+}
+.server-settings {
+    margin-top: 20px;
+}
+.server-setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+}
+.server-setting select {
+    display: block;
+    margin-top: 6px;
+}
+@media (max-width: 600px) {
+    .send-options,
+    .config-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .server-setting {
+        align-items: start;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .eyebrow {
+        display: none;
+    }
+}

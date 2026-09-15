@@ -1,5 +1,7 @@
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
+github.com/z46-dev/wasmdraw v0.0.3 h1:r3GSr/hBWv5Yowhw2dB5KKdhfzXSa8zF5p/am8Y/BsA=
+github.com/z46-dev/wasmdraw v0.0.3/go.mod h1:KpXPJ+TYkkWSYgGOtrKn+80Ti1zMZ9gQQekyR2wpdZk=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=
 go.yaml.in/yaml/v3 v3.0.5/go.mod h1:HVTZu1O7/Vkt2N+BFy8Zza+lnLsABggaTM2ZpNIGuKg=
 golang.org/x/net v0.59.0 h1:5zfYln+w5XCxwrnMMJPufRgNoXEaGxl0wo5GqPXyues=

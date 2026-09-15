@@ -36,3 +36,7 @@ node_modules/
 web/dist/
 web/public/main.wasm
 web/public/wasm_exec.js
+
+# Browser test artifacts
+test-results/
+playwright-report/

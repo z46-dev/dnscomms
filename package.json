@@ -7,8 +7,9 @@
         "dev": "bun --bun vite",
         "build": "bun --bun vite build",
         "preview": "bun --bun vite preview",
-        "check": "biome check biome.json package.json tsconfig.json web/app web/index.html web/vite-wasm.ts web/wasm.test.ts vite.config.ts && tsc --noEmit",
-        "test": "bun test web/wasm.test.ts"
+        "check": "biome check biome.json package.json tsconfig.json web/app web/index.html web/vite-wasm.ts web/wasm.test.ts web/browser.check.ts playwright.config.ts vite.config.ts && tsc --noEmit",
+        "test": "bun test web/wasm.test.ts",
+        "test:browser": "playwright test"
     },
     "dependencies": {
         "react": "^19.2.0",
@@ -16,6 +17,7 @@
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.0",
+        "@playwright/test": "^1.63.0",
         "@tailwindcss/vite": "^4.2.0",
         "@types/bun": "^1.4.2",
         "@types/node": "^26.5.1",

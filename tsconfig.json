@@ -11,5 +11,12 @@
         "skipLibCheck": true,
         "types": ["vite/client", "bun"]
     },
-    "include": ["web/app", "web/vite-wasm.ts", "web/wasm.test.ts", "vite.config.ts"]
+    "include": [
+        "web/app",
+        "web/vite-wasm.ts",
+        "web/wasm.test.ts",
+        "vite.config.ts",
+        "web/browser.check.ts",
+        "playwright.config.ts"
+    ]
 }

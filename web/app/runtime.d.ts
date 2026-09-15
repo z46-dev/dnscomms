@@ -8,5 +8,6 @@ declare global {
     }
 
     // Registered synchronously when the Go simulator starts.
+    function dnscommsCanvas(reducedMotion: boolean): string;
     function dnscommsSimulate(input: string): string;
 }

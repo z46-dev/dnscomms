@@ -53,10 +53,42 @@ bun install
 bun run dev
 ```
 
-Open the URL printed by Vite. React and Tailwind render a small local simulator;
-Go WASM uses the existing codecs to encode DNS responses and recover the message.
-The network simulator is not implemented yet; this screen performs an in-memory
-codec round trip and sends no DNS traffic.
+Open the URL printed by Vite. The **DNS Exfil** tab combines message sending with
+an orchestrator inbox. **Packet capture** shows completed hops, search, optional
+filters and wire details. **Config** controls regular-query frequency, cover
+traffic from the exfil client, total/exfil server counts and each exfil server’s
+upstream. The Go/WASM canvas shows a vertical client → firewall → DNS →
+orchestrator layout.
+
+The simulation uses fixed 20 ms ticks and 0.8-second links. Devices act only on
+packet arrival. An exfil server can resolve ordinary queries directly or forward
+them to a normal server; replies travel back through that server and the firewall.
+Pause freezes movement and application of pending replies. Reduced motion uses
+stationary markers at a packet’s current source.
+
+Regular traffic comes from the embedded [synthetic CSV](serverless/data/dns_traffic.csv):
+1,000 rows with 900 good and 100 bad labels. A frequency slider controls the
+average random spawn rate, and each spawned query independently picks a client,
+DNS server and CSV row. Labels describe synthetic patterns, not actual domain
+reputation.
+Regular questions fetch **live Cloudflare DNS-over-HTTPS responses** using Go’s
+`net/http` and [DNS wire format](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-wireformat/).
+This needs internet access; DNS answers and network latency vary. Lookups run
+asynchronously with a five-second timeout and at most 16 pending requests.
+Failures produce visible SERVFAIL replies. Reset cancels pending lookups.
+
+Messages typed into the exfil editor stay inside the simulation and use the real
+codec. Sending only to normal servers leaves the transfer incomplete. History
+retains the latest 1,500 events and up to 32 transfers. Configuration changes are
+locked during an active transfer.
+
+Native `serverless.New()` uses deterministic fixture answers for offline tests;
+the browser supplies `serverless.CloudflareDNS`. CI mocks DoH responses while
+exercising the actual Go HTTP adapter and browser request path. To check live DNS:
+
+```sh
+DNSCOMMS_LIVE_DNS=1 go test ./serverless -run TestCloudflareLive -v
+```
 
 Vite builds WASM before serving, watches Go files and `go.mod`/`go.sum`, and reloads
 the page after a successful rebuild. A Go rebuild resets the form. The matching
@@ -66,7 +98,10 @@ the page after a successful rebuild. A Go rebuild resets the form. The matching
 bun run build    # Build frontend and WASM into web/dist
 bun run preview  # Preview the production build
 bun run check    # Frontend formatting, lint, and TypeScript checks
-bun test         # Real Go WASM round-trip tests
+bun run test     # Real Go WASM network tests
+go test ./...    # Codec and simulation behavior tests
+bunx playwright install chromium
+bun run test:browser # Browser smoke test against the production build
 ```
 
 GitHub Actions runs these checks alongside Go formatting, vet, tests, and builds.
