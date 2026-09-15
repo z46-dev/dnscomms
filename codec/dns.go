@@ -3,6 +3,7 @@ package codec
 import (
 	"encoding/base64"
 	"errors"
+	"strings"
 
 	"golang.org/x/net/dns/dnsmessage"
 )
@@ -15,11 +16,11 @@ type EncodeableType struct {
 var EncodeableTypes = map[dnsmessage.Type]EncodeableType{
 	dnsmessage.TypeA: {
 		RecordType:       dnsmessage.TypeA,
-		MaxPayloadLength: 253,
+		MaxPayloadLength: 187,
 	},
 	dnsmessage.TypeAAAA: {
 		RecordType:       dnsmessage.TypeAAAA,
-		MaxPayloadLength: 253,
+		MaxPayloadLength: 187,
 	},
 	dnsmessage.TypeTXT: {
 		RecordType:       dnsmessage.TypeTXT,
@@ -54,7 +55,18 @@ func Encode(recordType dnsmessage.Type, data []byte) (message []byte, err error)
 
 	var name string = "."
 	if encodeableType.RecordType == dnsmessage.TypeA || encodeableType.RecordType == dnsmessage.TypeAAAA {
-		name = base64.RawURLEncoding.EncodeToString(data) + "."
+		var (
+			encoded string = base64.RawURLEncoding.EncodeToString(data)
+			labels  []string
+		)
+
+		for len(encoded) > 0 {
+			var length int = min(63, len(encoded))
+			labels = append(labels, encoded[:length])
+			encoded = encoded[length:]
+		}
+
+		name = strings.Join(labels, ".") + "."
 	}
 
 	if err = b.Question(dnsmessage.Question{
@@ -92,56 +104,48 @@ func Encode(recordType dnsmessage.Type, data []byte) (message []byte, err error)
 		}
 	}
 
+	message, err = b.Finish()
 	return
 }
 
-// Decode decodes a DNS response message, extracting
+// Decode extracts the payload from an encoded DNS query.
 func Decode(message []byte) (recordType dnsmessage.Type, data []byte, err error) {
-	var resp dnsmessage.Message
-	if err = resp.Unpack(message); err != nil {
+	var query dnsmessage.Message
+	if err = query.Unpack(message); err != nil {
 		return
 	}
 
-	if len(resp.Answers) == 0 {
-		err = errors.New("no answers in DNS response")
+	if len(query.Questions) != 1 {
+		err = errors.New("expected one DNS question")
 		return
 	}
 
-	var (
-		answer dnsmessage.Resource
-		ok     bool
-	)
-
-	answer = resp.Answers[0]
-	recordType = answer.Header.Type
+	recordType = query.Questions[0].Type
 
 	switch recordType {
-	case dnsmessage.TypeA:
-		var aRecord *dnsmessage.AResource
-		if aRecord, ok = answer.Body.(*dnsmessage.AResource); ok {
-			data = aRecord.A[:]
-		} else {
-			err = errors.New("failed to decode A record")
-		}
-	case dnsmessage.TypeAAAA:
-		var aaaaRecord *dnsmessage.AAAAResource
-		if aaaaRecord, ok = answer.Body.(*dnsmessage.AAAAResource); ok {
-			data = aaaaRecord.AAAA[:]
-		} else {
-			err = errors.New("failed to decode AAAA record")
-		}
+	case dnsmessage.TypeA, dnsmessage.TypeAAAA:
+		data, err = base64.RawURLEncoding.DecodeString(strings.ReplaceAll(strings.TrimSuffix(query.Questions[0].Name.String(), "."), ".", ""))
 	case dnsmessage.TypeTXT:
-		var txtRecord *dnsmessage.TXTResource
-		if txtRecord, ok = answer.Body.(*dnsmessage.TXTResource); ok {
-			data = []byte{}
-			for _, txt := range txtRecord.TXT {
-				data = append(data, []byte(txt)...)
-			}
-		} else {
-			err = errors.New("failed to decode TXT record")
+		if len(query.Additionals) != 1 || query.Additionals[0].Header.Type != dnsmessage.TypeTXT {
+			err = errors.New("expected one additional TXT resource")
+			return
+		}
+
+		var (
+			txtRecord *dnsmessage.TXTResource
+			ok        bool
+		)
+
+		if txtRecord, ok = query.Additionals[0].Body.(*dnsmessage.TXTResource); !ok {
+			err = errors.New("failed to decode TXT resource")
+			return
+		}
+
+		for _, chunk := range txtRecord.TXT {
+			data = append(data, chunk...)
 		}
 	default:
-		err = errors.New("unsupported record type in DNS response")
+		err = errors.New("unsupported record type in DNS query")
 	}
 
 	return
