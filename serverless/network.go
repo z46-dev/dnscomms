@@ -18,7 +18,17 @@ const HistoryLimit = 1500
 
 // New creates the topology; an optional resolver replaces offline fixture answers.
 func New(resolvers ...Resolver) (network *Network) {
-	network = &Network{TrafficFrequency: 0.75, results: make(chan resolutionResult, 16), random: rand.New(rand.NewPCG(1, 2)), Packets: []*Packet{}, Playing: true, Speed: 1, Servers: []Server{{ID: "dns-1", Poisoned: true}, {ID: "dns-2"}, {ID: "dns-3", Poisoned: true}}, Events: []Event{}, Transfers: []*Transfer{}}
+	network = &Network{
+		TrafficFrequency: 0.5,
+		results:          make(chan resolutionResult, 16),
+		random:           rand.New(rand.NewPCG(1, 2)),
+		Packets:          []*Packet{},
+		Playing:          false,
+		Speed:            1,
+		Servers:          []Server{{ID: "dns-1", Poisoned: true}, {ID: "dns-2"}, {ID: "dns-3", Poisoned: true, ForwardTo: "dns-2"}},
+		Events:           []Event{},
+		Transfers:        []*Transfer{},
+	}
 	network.context, network.cancel = context.WithCancel(context.Background())
 	if len(resolvers) > 0 {
 		network.resolver = resolvers[0]

@@ -24,8 +24,12 @@ function run(command: Command): Simulation {
 
 for (const type of ["TXT", "A", "AAAA"]) {
     test(`${type} transfers UTF-8 through the real Go WASM network`, () => {
-        run({ action: "reset" });
+        const reset = run({ action: "reset" });
+        expect(reset.playing).toBe(false);
+        expect(reset.trafficFrequency).toBe(0.5);
+        expect(reset.servers[2]?.forwardTo).toBe("dns-2");
         run({ action: "configure", trafficFrequency: 0 });
+        run({ action: "playback", playing: true, speed: 1 });
         const message = "Hello, 世界! ".repeat(30);
         const initial = run({
             action: "send",
@@ -63,7 +67,6 @@ test("normal routing, paused playback and invalid commands preserve runtime inte
         types: ["A"],
         duration: 1
     });
-    run({ action: "playback", playing: false, speed: 1 });
     expect(run({ action: "tick", delta: 1 }).time).toBe(0);
     run({ action: "playback", playing: true, speed: 1 });
     for (let tick = 0; tick < 4; tick++) run({ action: "tick", delta: 1 });

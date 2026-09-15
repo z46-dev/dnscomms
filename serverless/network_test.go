@@ -23,6 +23,7 @@ func TestTraffic(t *testing.T) {
 					lastTime float64
 					err      error
 				)
+				apply(t, network, Input{Action: "playback", Playing: true, Speed: 1})
 				apply(t, network, Input{Action: "send", Message: message, Targets: []string{target}, Types: []string{record}, Duration: 3, Vary: true})
 				if err = network.Apply(Input{Action: "configure", Servers: network.Servers}); err == nil {
 					t.Fatal("active topology mutation accepted")
@@ -92,6 +93,11 @@ func TestPlaybackAndBounds(t *testing.T) {
 		second   *Network = New()
 		snapshot int
 	)
+	if first.Playing || first.TrafficFrequency != 0.5 || first.Servers[2].ForwardTo != "dns-2" {
+		t.Fatal("unexpected simulation defaults")
+	}
+	apply(t, first, Input{Action: "playback", Playing: true, Speed: 1})
+	apply(t, second, Input{Action: "playback", Playing: true, Speed: 1})
 	for range 12 {
 		apply(t, first, Input{Action: "tick", Delta: 0.5})
 	}
@@ -160,6 +166,7 @@ func TestRejectedParts(t *testing.T) {
 		t.Fatal(err)
 	}
 	network = New()
+	apply(t, network, Input{Action: "playback", Playing: true, Speed: 1})
 	network.route("client-1", "dns-1", wire, nil)
 	for range 4 {
 		apply(t, network, Input{Action: "tick", Delta: 1})
@@ -182,6 +189,7 @@ func apply(t *testing.T, network *Network, input Input) {
 // TestMixedRouting retains received parts when one request reaches a normal server.
 func TestMixedRouting(t *testing.T) {
 	var network *Network = New()
+	apply(t, network, Input{Action: "playback", Playing: true, Speed: 1})
 	apply(t, network, Input{Action: "send", Message: strings.Repeat("x", 400), Targets: []string{"dns-1"}, Types: []string{"A"}, Duration: 1})
 	network.Transfers[0].Requests[1].Target = "dns-2"
 	for range 5 {
@@ -223,6 +231,7 @@ func TestHopDelivery(t *testing.T) {
 		progress  float64
 	)
 	apply(t, network, Input{Action: "configure", TrafficFrequency: &frequency})
+	apply(t, network, Input{Action: "playback", Playing: true, Speed: 1})
 	apply(t, network, Input{Action: "send", Message: "on arrival", Targets: []string{"dns-1"}, Types: []string{"A"}, Duration: 1})
 	transfer = network.Transfers[0]
 	apply(t, network, Input{Action: "tick", Delta: 1})
@@ -267,6 +276,7 @@ func TestTrafficConfiguration(t *testing.T) {
 		err       error
 	)
 	apply(t, network, Input{Action: "configure", TrafficFrequency: &frequency, EvilCover: &evil})
+	apply(t, network, Input{Action: "playback", Playing: true, Speed: 1})
 	apply(t, network, Input{Action: "tick", Delta: 1})
 	if len(network.Packets) < 2 || !slices.ContainsFunc(network.Packets, func(packet *Packet) bool { return packet.Client == "exfil-client" && packet.transfer == nil }) {
 		t.Fatal("random cover from the exfil client was not scheduled")

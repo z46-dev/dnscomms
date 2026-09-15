@@ -44,6 +44,7 @@ test("combined exfil, configuration, capture and vertical map work together", as
         .fill("Browser round trip 世界");
     await page.getByLabel("Duration (seconds)").fill("1");
     await page.getByRole("button", { name: "Send transfer" }).click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await expect(
         page
             .getByRole("region", { name: "Orchestrator inbox" })
@@ -125,6 +126,7 @@ test("combined exfil, configuration, capture and vertical map work together", as
     await page.getByLabel("dns-1exfil", { exact: true }).uncheck();
     await page.getByLabel("dns-2normal", { exact: true }).check();
     await page.getByRole("button", { name: "Send transfer" }).click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await expect(page.getByText("incomplete", { exact: true })).toBeVisible();
     await expect(
         page

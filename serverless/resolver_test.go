@@ -84,6 +84,7 @@ func TestAsyncForwarding(t *testing.T) {
 	)
 	defer network.cancel()
 	apply(t, network, Input{Action: "configure", TrafficFrequency: &frequency, Servers: []Server{{ID: "dns-1", Poisoned: true, ForwardTo: "dns-2"}, {ID: "dns-2"}}})
+	apply(t, network, Input{Action: "playback", Speed: 1, Playing: true})
 	network.route("client-1", "dns-1", ordinaryQuery(t), nil)
 	for range 3 {
 		apply(t, network, Input{Action: "tick", Delta: HopDuration})
